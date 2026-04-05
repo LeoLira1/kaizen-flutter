@@ -1,0 +1,78 @@
+name: Build & Release APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version name (e.g. 1.0.0)'
+        required: true
+        default: '1.0.0'
+
+jobs:
+  build:
+    name: Build Release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Analyze code
+        run: flutter analyze --no-fatal-infos
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Rename APK
+        run: |
+          VERSION="${{ github.event.inputs.version || github.ref_name }}"
+          cp build/app/outputs/flutter-apk/app-release.apk \
+             build/app/outputs/flutter-apk/corpo-em-evolucao-${VERSION}.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk
+          path: build/app/outputs/flutter-apk/corpo-em-evolucao-*.apk
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Corpo em Evolução ${{ github.ref_name }}"
+          body: |
+            ## Corpo em Evolução ${{ github.ref_name }}
+
+            ### Download
+            Baixe o APK abaixo e instale no seu Android.
+
+            > **Atenção:** Pode ser necessário habilitar "Instalar de fontes desconhecidas" nas configurações do Android.
+
+            ### O que há nesta versão
+            - Dashboard de composição corporal
+            - Métricas: Peso, Gordura, Músculo, Água, Visceral, Proteína
+            - Metas de peso e gordura com progresso visual
+            - Projeção de ritmo e análise do período
+          files: build/app/outputs/flutter-apk/corpo-em-evolucao-*.apk
+          draft: false
+          prerelease: false
