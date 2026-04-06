@@ -63,10 +63,11 @@ class TursoService {
     ]);
   }
 
-  // Turso exige valor float como string com ponto decimal ("50.0", não "50")
-  static String _f(dynamic v) {
-    final d = v is double ? v : v is int ? v.toDouble() : double.tryParse(v?.toString() ?? '') ?? 0.0;
-    return d.toString();
+  // Turso espera valor float como número JSON (não string)
+  static double _f(dynamic v) {
+    if (v is double) return v;
+    if (v is int) return v.toDouble();
+    return double.tryParse(v?.toString() ?? '') ?? 0.0;
   }
 
   Future<void> saveMeasurement(Map<String, dynamic> d) async {
