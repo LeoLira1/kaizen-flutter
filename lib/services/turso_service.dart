@@ -63,6 +63,12 @@ class TursoService {
     ]);
   }
 
+  // Turso exige valor float como string com ponto decimal ("50.0", não "50")
+  static String _f(dynamic v) {
+    final d = v is double ? v : v is int ? v.toDouble() : double.tryParse(v?.toString() ?? '') ?? 0.0;
+    return d.toString();
+  }
+
   Future<void> saveMeasurement(Map<String, dynamic> d) async {
     String? _s(String key) {
       final v = d[key];
@@ -81,16 +87,16 @@ class TursoService {
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
           'args': [
             {'type': 'text', 'value': _s('measured_at') ?? DateTime.now().toIso8601String()},
-            {'type': 'float', 'value': (d['score'] ?? 0).toString()},
-            {'type': 'float', 'value': (d['weight'] ?? 0).toString()},
-            {'type': 'float', 'value': (d['fat'] ?? 0).toString()},
-            {'type': 'float', 'value': (d['muscle'] ?? 0).toString()},
-            {'type': 'float', 'value': (d['water'] ?? 0).toString()},
-            {'type': 'float', 'value': (d['visceral'] ?? 0).toString()},
-            {'type': 'float', 'value': (d['protein'] ?? 0).toString()},
-            {'type': 'float', 'value': (d['bone_mass'] ?? 0).toString()},
-            {'type': 'float', 'value': (d['bmi'] ?? 0).toString()},
-            {'type': 'float', 'value': (d['basal'] ?? 0).toString()},
+            {'type': 'float', 'value': _f(d['score'])},
+            {'type': 'float', 'value': _f(d['weight'])},
+            {'type': 'float', 'value': _f(d['fat'])},
+            {'type': 'float', 'value': _f(d['muscle'])},
+            {'type': 'float', 'value': _f(d['water'])},
+            {'type': 'float', 'value': _f(d['visceral'])},
+            {'type': 'float', 'value': _f(d['protein'])},
+            {'type': 'float', 'value': _f(d['bone_mass'])},
+            {'type': 'float', 'value': _f(d['bmi'])},
+            {'type': 'float', 'value': _f(d['basal'])},
             {'type': 'text', 'value': _s('body_type') ?? ''},
             {'type': 'text', 'value': _s('weight_status') ?? ''},
             {'type': 'text', 'value': _s('fat_status') ?? ''},
