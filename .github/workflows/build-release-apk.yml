@@ -58,30 +58,26 @@ jobs:
           retention-days: 30
 
       - name: Upload APK to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION="${{ github.ref_name }}"
+          VERSION="${{ github.event.inputs.version || github.ref_name }}"
           APK="build/app/outputs/flutter-apk/corpo-em-evolucao-${VERSION}.apk"
+
+          echo "==> VERSION: $VERSION"
+          echo "==> APK: $APK"
+          ls -la build/app/outputs/flutter-apk/
+
           NOTES="## Corpo em Evolução ${VERSION}
 
-          ### Download
           Baixe o APK abaixo e instale no seu Android.
 
-          > **Atenção:** Pode ser necessário habilitar \"Instalar de fontes desconhecidas\" nas configurações do Android.
+          > Pode ser necessário habilitar \"Instalar de fontes desconhecidas\" nas configurações do Android."
 
-          ### O que há nesta versão
-          - Dashboard de composição corporal
-          - Métricas: Peso, Gordura, Músculo, Água, Visceral, Proteína
-          - Metas de peso e gordura com progresso visual
-          - Projeção de ritmo e análise do período"
-
-          if gh release view "$VERSION" > /dev/null 2>&1; then
-            gh release upload "$VERSION" "$APK" --clobber
-          else
-            gh release create "$VERSION" \
-              --title "Corpo em Evolução ${VERSION}" \
-              --notes "$NOTES" \
-              "$APK"
-          fi
+          # Tenta criar a release com o APK; se já existir, faz upload para a existente
+          gh release create "$VERSION" \
+            --title "Corpo em Evolução ${VERSION}" \
+            --notes "$NOTES" \
+            --latest \
+            "$APK" \
+          || gh release upload "$VERSION" "$APK" --clobber
