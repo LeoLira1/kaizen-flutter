@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import '../services/app_preferences.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -15,6 +16,10 @@ class _SettingsPageState extends State<SettingsPage> {
   final _goalWeight = TextEditingController();
   final _goalFat = TextEditingController();
   final _minWeight = TextEditingController();
+  final _targetWeeklyMin = TextEditingController();
+  final _targetWeeklyMax = TextEditingController();
+
+  final _preferences = AppPreferences();
 
   bool _obscureKey = true;
   bool _obscureToken = true;
@@ -26,30 +31,64 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _load() async {
-    final p = await SharedPreferences.getInstance();
-    _apiKey.text = p.getString('anthropic_api_key') ?? '';
-    _tursoUrl.text = p.getString('turso_url') ?? '';
-    _tursoToken.text = p.getString('turso_token') ?? '';
-    _goalWeight.text = (p.getDouble('goal_weight') ?? 96.0).toString();
-    _goalFat.text = (p.getDouble('goal_fat') ?? 20.0).toString();
-    _minWeight.text = (p.getDouble('min_weight') ?? 80.0).toString();
+    final credentials = await _preferences.loadCredentials();
+    final settings = await _preferences.loadSettings();
+    if (!mounted) return;
+    setState(() {
+      _apiKey.text = credentials.anthropicApiKey;
+      _tursoUrl.text = credentials.tursoUrl;
+      _tursoToken.text = credentials.tursoToken;
+      _goalWeight.text = settings.goalWeight.toString();
+      _goalFat.text = settings.goalFat.toString();
+      _minWeight.text = settings.minWeight.toString();
+      _targetWeeklyMin.text = settings.targetWeeklyGainMin.toString();
+      _targetWeeklyMax.text = settings.targetWeeklyGainMax.toString();
+    });
   }
 
   Future<void> _save() async {
-    final p = await SharedPreferences.getInstance();
-    await p.setString('anthropic_api_key', _apiKey.text.trim());
-    await p.setString('turso_url', _tursoUrl.text.trim());
-    await p.setString('turso_token', _tursoToken.text.trim());
-    await p.setDouble('goal_weight', double.tryParse(_goalWeight.text) ?? 96.0);
-    await p.setDouble('goal_fat', double.tryParse(_goalFat.text) ?? 20.0);
-    await p.setDouble('min_weight', double.tryParse(_minWeight.text) ?? 80.0);
-    if (mounted) {
+    final targetMin = _number(_targetWeeklyMin.text);
+    final targetMax = _number(_targetWeeklyMax.text);
+    if (targetMin == null ||
+        targetMax == null ||
+        targetMin < 0 ||
+        targetMax < targetMin) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Configurações salvas!')),
+        const SnackBar(
+          content: Text(
+            'Informe ritmos válidos: o máximo deve ser maior ou igual ao mínimo.',
+          ),
+          backgroundColor: Color(0xFFD45F50),
+        ),
       );
+      return;
+    }
+
+    await _preferences.saveCredentials(
+      AppCredentials(
+        anthropicApiKey: _apiKey.text.trim(),
+        tursoUrl: _tursoUrl.text.trim(),
+        tursoToken: _tursoToken.text.trim(),
+      ),
+    );
+    await _preferences.saveSettings(
+      AppSettings(
+        goalWeight: _number(_goalWeight.text) ?? 96,
+        goalFat: _number(_goalFat.text) ?? 20,
+        minWeight: _number(_minWeight.text) ?? 80,
+        targetWeeklyGainMin: targetMin,
+        targetWeeklyGainMax: targetMax,
+      ),
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Configurações salvas!')));
       Navigator.pop(context, true);
     }
   }
+
+  double? _number(String value) =>
+      double.tryParse(value.trim().replaceAll(',', '.'));
 
   @override
   void dispose() {
@@ -59,6 +98,8 @@ class _SettingsPageState extends State<SettingsPage> {
     _goalWeight.dispose();
     _goalFat.dispose();
     _minWeight.dispose();
+    _targetWeeklyMin.dispose();
+    _targetWeeklyMax.dispose();
     super.dispose();
   }
 
@@ -71,7 +112,10 @@ class _SettingsPageState extends State<SettingsPage> {
         elevation: 0,
         title: const Text(
           'Configurações',
-          style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF2C2A26)),
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF2C2A26),
+          ),
         ),
       ),
       body: ListView(
@@ -101,9 +145,12 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 28),
           _section('Metas'),
-          Row(
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
             children: [
-              Expanded(
+              SizedBox(
+                width: 180,
                 child: _field(
                   controller: _goalWeight,
                   label: 'Meta de peso (kg)',
@@ -111,8 +158,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   numeric: true,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
+              SizedBox(
+                width: 180,
                 child: _field(
                   controller: _goalFat,
                   label: 'Meta gordura (%)',
@@ -120,8 +167,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   numeric: true,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
+              SizedBox(
+                width: 180,
                 child: _field(
                   controller: _minWeight,
                   label: 'Peso mínimo (kg)',
@@ -131,6 +178,39 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ],
           ),
+          const SizedBox(height: 28),
+          _section('Ritmo alvo'),
+          const Text(
+            'Intervalo desejado de ganho de peso por semana.',
+            style: TextStyle(fontSize: 13, color: Color(0xFF7A746E)),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _field(
+                  controller: _targetWeeklyMin,
+                  label: 'Mínimo (kg/sem)',
+                  hint: '0,15',
+                  numeric: true,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _field(
+                  controller: _targetWeeklyMax,
+                  label: 'Máximo (kg/sem)',
+                  hint: '0,30',
+                  numeric: true,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '“Muito acima” significa mais de 2× o ritmo máximo configurado.',
+            style: TextStyle(fontSize: 12, color: Color(0xFF7A746E)),
+          ),
           const SizedBox(height: 32),
           FilledButton(
             onPressed: _save,
@@ -138,7 +218,8 @@ class _SettingsPageState extends State<SettingsPage> {
               minimumSize: const Size.fromHeight(52),
               backgroundColor: const Color(0xFF2C2A26),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
+                borderRadius: BorderRadius.circular(16),
+              ),
             ),
             child: const Text('Salvar', style: TextStyle(fontSize: 16)),
           ),
@@ -148,17 +229,17 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _section(String title) => Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Text(
-          title,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF7A746E),
-            letterSpacing: 1.1,
-          ),
-        ),
-      );
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Text(
+      title,
+      style: const TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w800,
+        color: Color(0xFF7A746E),
+        letterSpacing: 1.1,
+      ),
+    ),
+  );
 
   Widget _field({
     required TextEditingController controller,
