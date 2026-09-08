@@ -74,6 +74,13 @@ class BodyData {
   double get fatDelta => fat - initialFat;
   double get muscleDelta => muscle - initialMuscle;
 
+  double get fatMass => weight * fat / 100;
+  double get fatFreeMass => weight - fatMass;
+  double get initialFatMass => initialWeight * initialFat / 100;
+  double get initialFatFreeMass => initialWeight - initialFatMass;
+  double get fatMassDelta => fatMass - initialFatMass;
+  double get fatFreeMassDelta => fatFreeMass - initialFatFreeMass;
+
   double get weightRatePerWeek => totalWeightDelta / (days / 7);
   double get fatRatePerWeek => fatDelta / (days / 7);
 

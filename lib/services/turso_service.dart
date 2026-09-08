@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
 
 class TursoService {
@@ -57,7 +58,7 @@ class TursoService {
             protein_status TEXT,
             created_at TEXT DEFAULT (datetime('now'))
           )''',
-        }
+        },
       },
       {'type': 'close'},
     ]);
@@ -87,7 +88,10 @@ class TursoService {
              water_status, visceral_status, protein_status)
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
           'args': [
-            {'type': 'text', 'value': _s('measured_at') ?? DateTime.now().toIso8601String()},
+            {
+              'type': 'text',
+              'value': _s('measured_at') ?? DateTime.now().toIso8601String(),
+            },
             {'type': 'float', 'value': _f(d['score'])},
             {'type': 'float', 'value': _f(d['weight'])},
             {'type': 'float', 'value': _f(d['fat'])},
@@ -106,31 +110,29 @@ class TursoService {
             {'type': 'text', 'value': _s('visceral_status') ?? ''},
             {'type': 'text', 'value': _s('protein_status') ?? ''},
           ],
-        }
+        },
       },
       {'type': 'close'},
     ]);
   }
 
-  Future<List<Map<String, dynamic>>> getHistory({int limit = 30}) async {
+  Future<List<Map<String, dynamic>>> getHistory({int? limit}) async {
+    final statement = <String, dynamic>{
+      'sql': limit == null
+          ? 'SELECT * FROM body_measurements ORDER BY created_at DESC'
+          : 'SELECT * FROM body_measurements ORDER BY created_at DESC LIMIT ?',
+      if (limit != null)
+        'args': [
+          {'type': 'integer', 'value': limit.toString()},
+        ],
+    };
     final results = await _pipeline([
-      {
-        'type': 'execute',
-        'stmt': {
-          'sql':
-              'SELECT * FROM body_measurements ORDER BY created_at DESC LIMIT ?',
-          'args': [
-            {'type': 'integer', 'value': limit.toString()}
-          ],
-        }
-      },
+      {'type': 'execute', 'stmt': statement},
       {'type': 'close'},
     ]);
 
-    final rows =
-        results[0]['response']['result']['rows'] as List? ?? [];
-    final cols =
-        results[0]['response']['result']['cols'] as List? ?? [];
+    final rows = results[0]['response']['result']['rows'] as List? ?? [];
+    final cols = results[0]['response']['result']['cols'] as List? ?? [];
     final names = cols.map((c) => c['name'] as String).toList();
 
     return rows.map<Map<String, dynamic>>((row) {

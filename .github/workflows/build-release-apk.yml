@@ -4,6 +4,9 @@ on:
   push:
     tags:
       - 'v*'
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       version:
@@ -41,16 +44,21 @@ jobs:
       - name: Analyze code
         run: flutter analyze --no-fatal-infos
 
+      - name: Run tests
+        run: flutter test
+
       - name: Build release APK
         run: flutter build apk --release
 
       - name: Rename APK
+        if: github.event_name != 'pull_request'
         run: |
           VERSION="${{ github.event.inputs.version || github.ref_name }}"
           cp build/app/outputs/flutter-apk/app-release.apk \
              build/app/outputs/flutter-apk/corpo-em-evolucao-${VERSION}.apk
 
       - name: Upload APK artifact
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: release-apk
@@ -58,6 +66,7 @@ jobs:
           retention-days: 30
 
       - name: Upload APK to GitHub Release
+        if: github.event_name != 'pull_request'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
